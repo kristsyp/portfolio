@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Продолжение стихов</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { margin: 2rem; }
+    textarea, input[type="number"] { width: 100%; resize: vertical; }
+    .timer { font-weight: bold; margin-left: 0.5rem; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="mb-4">Продолжи стихотворение</h1>
+
+    <div class="mb-3">
+      <label for="input_text" class="form-label">Ваш текст</label>
+      <textarea id="input_text" class="form-control" rows="4" placeholder="Введите текст..."></textarea>
+    </div>
+
+    <div class="mb-3">
+      <label for="max_tokens" class="form-label">Максимальная длина продолжения</label>
+      <input
+        id="max_tokens"
+        type="number"
+        class="form-control"
+        value="60"
+        min="40"
+        max="200"
+      />
+    </div>
+
+    <div class="mb-3">
+      <button id="gen_btn" class="btn btn-primary">Сгенерировать</button>
+      <button id="rerun_btn" class="btn btn-secondary ms-2" disabled>Повторить</button>
+      <span id="timer" class="timer"></span>
+    </div>
+
+    <div id="result_row" class="row gy-3"></div>
+  </div>
+
+  <script>
+    const btn       = document.getElementById('gen_btn');
+    const rerun     = document.getElementById('rerun_btn');
+    const input     = document.getElementById('input_text');
+    const maxTokens = document.getElementById('max_tokens');
+    const row       = document.getElementById('result_row');
+    const timerSpan = document.getElementById('timer');
+    let lastPayload = null;
+
+    async function doGenerate(payload) {
+      row.innerHTML = `
+        <div class="d-flex justify-content-center w-100">
+          <div class="spinner-border" role="status"></div>
+          <span class="ms-2">Генерируется…</span>
+        </div>
+      `;
+      timerSpan.textContent = '0.0s';
+      const start = performance.now();
+      const interval = setInterval(() => {
+        const elapsed = ((performance.now() - start) / 1000).toFixed(1);
+        timerSpan.textContent = `${elapsed}s`;
+      }, 100);
+
+      try {
+        const res = await fetch('/generate', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        clearInterval(interval);
+        timerSpan.textContent += ' (завершено)';
+
+        row.innerHTML = '';
+        data.examples.forEach(ex => {
+          const col = document.createElement('div');
+          col.className = 'col-md-4';
+          col.innerHTML = `
+            <div class="card h-100">
+              <div class="card-body">
+                <h5 class="card-title">Score: ${ex.score}</h5>
+                <pre class="card-text">${ex.text}</pre>
+              </div>
+            </div>
+          `;
+          row.append(col);
+        });
+        rerun.disabled = false;
+      } catch (err) {
+        clearInterval(interval);
+        timerSpan.textContent = 'Ошибка';
+        row.innerHTML = `<div class="text-danger">Ошибка: ${err.message}</div>`;
+      }
+    }
+
+    btn.addEventListener('click', () => {
+      const text = input.value.trim();
+      if (!text) return;
+      const length = parseInt(maxTokens.value, 10) || 60;
+      lastPayload = { input_text: text, max_new_tokens: length };
+      doGenerate(lastPayload);
+    });
+
+    rerun.addEventListener('click', () => {
+      if (lastPayload) doGenerate(lastPayload);
+    });
+  </script>
+</body>
+</html>
