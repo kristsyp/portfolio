@@ -1,38 +1,31 @@
 markdown
-# Poem Generator
+# 🎭 Poem Generator
+
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0.0-EE4C2C?logo=pytorch)](https://pytorch.org/)
+[![HuggingFace](https://img.shields.io/badge/🤗-Transformers-FFD21E)](https://huggingface.co/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 > Лёгковесный сервис для генерации поэтических продолжений с помощью Seq2Seq-моделей из HuggingFace Transformers.  
-> Предоставляет REST API и простой веб-интерфейс на Bootstrap.
-
----
-
-## 📌 Оглавление
-
-1. [Установка](#установка)
-2. [Структура проекта](#структура-проекта)
-3. [Конфигурация](#конфигурация)
-4. [Запуск](#запуск)
-5. [Веб-интерфейс](#веб-интерфейс)
-6. [API](#api)
-7. [Стек технологий](#стек-технологий)
+> Предоставляет **REST API** и простой **веб-интерфейс** на Bootstrap.
 
 ---
 
 ## 🔧 Установка
 
-### 1. Клонируйте репозиторий
+### 1️⃣ Клонируйте репозиторий
 
 ```bash
-git clone git@github.com:kristsyp/01_poem_generator.git
+git clone git@github.com:KsuZavyalova/poem_generator.git
 cd poem_generator
-2. Скачайте модели
+2️⃣ Скачайте модели
 Модели доступны по ссылке:
 🔗 Google Drive
 
 Скачайте и разместите папки epoch-3/ и best_model_optuna_2/ в корне проекта.
 
-3. Создайте и активируйте виртуальное окружение
-Linux/macOS:
+### 3️⃣ Создайте виртуальное окружение
+Linux / macOS:
 
 bash
 python3 -m venv venv
@@ -42,7 +35,7 @@ Windows:
 bash
 python -m venv venv
 venv\Scripts\activate
-4. Установите зависимости
+4️⃣ Установите зависимости
 bash
 pip install --upgrade pip
 pip install -r requirements.txt
@@ -51,41 +44,57 @@ text
 poem_generator/
 │
 ├── app.py                          # Основной файл приложения (FastAPI)
-├── reward.py                       # Функция оценки качества сгенерированного текста
+├── reward.py                       # Функция оценки качества текста
 ├── requirements.txt                # Зависимости
 │
-├── length_profiles.json            # Профили семплинга для основной модели
-├── length_profiles_MLE.json        # Профили семплинга для MLE-модели
+├── length_profiles.json            # Профили семплинга (PPO-модель)
+├── length_profiles_MLE.json        # Профили семплинга (MLE-модель)
 │
 ├── templates/
 │   └── index.html                  # Веб-интерфейс (Bootstrap)
 │
 ├── epoch-3/                        # MLE-модель (3 эпохи)
-│   └── ...
-│
-├── best_model_optuna_2/            # PPO-модель (дообученная с Optuna)
-│   └── ...
+├── best_model_optuna_2/            # PPO-модель (Optuna)
 │
 └── README.md
 ⚙️ Конфигурация
-Файл	Назначение
-length_profiles.json	Оптимальные параметры семплинга для PPO-модели (зависят от длины продолжения)
-length_profiles_MLE.json	Оптимальные параметры семплинга для MLE-модели
-epoch-3/	Базовая модель, обученная методом MLE на отфильтрованном корпусе
-best_model_optuna_2/	Дообученная модель (PPO + Optuna) с учётом метра, ритма и рифмы
-Важно: Директории моделей должны находиться в корне проекта рядом с app.py.
+Файлы конфигурации:
+
+length_profiles.json — оптимальные параметры семплинга для PPO-модели (зависят от длины продолжения)
+
+length_profiles_MLE.json — оптимальные параметры семплинга для MLE-модели
+
+Модели:
+
+epoch-3/ — базовая модель, обученная методом MLE на отфильтрованном корпусе
+
+best_model_optuna_2/ — дообученная модель (PPO + Optuna) с учётом метра, ритма и рифмы
+
+⚠️ Важно: Директории моделей должны находиться в корне проекта рядом с app.py.
 
 ▶️ Запуск
 bash
 uvicorn app:app --reload --host 0.0.0.0 --port 8000
-Параметр	Описание
---reload	Автоматическая перезагрузка при изменении кода (для разработки)
---host 0.0.0.0	Доступ с любого устройства в сети
---port 8000	Порт для запуска
-🌐 Веб-интерфейс
-После запуска откройте в браузере: http://localhost:8000
+Параметры:
 
-Введите начальные строки стихотворения в поле ввода
+--reload — авто-перезагрузка при изменении кода (для разработки)
+
+--host 0.0.0.0 — доступ с любого устройства в сети
+
+--port 8000 — порт для запуска
+
+После запуска откройте в браузере:
+
+Веб-интерфейс: http://localhost:8000
+
+Swagger UI: http://localhost:8000/docs
+
+ReDoc: http://localhost:8000/redoc
+
+🌐 Веб-интерфейс
+Откройте http://localhost:8000
+
+Введите начальные строки стихотворения
 
 Укажите желаемую длину продолжения (в токенах)
 
@@ -102,29 +111,36 @@ uvicorn app:app --reload --host 0.0.0.0 --port 8000
 Время выполнения
 
 📚 API
-Swagger UI
-Интерактивная документация доступна по адресу:
-http://localhost:8000/docs
+Эндпоинты:
 
-ReDoc
-Альтернативная документация:
-http://localhost:8000/redoc
+POST /generate — генерация поэтического продолжения
 
-Эндпоинты
-Метод	Эндпоинт	Описание
-POST	/generate	Генерация поэтического продолжения
-GET	/health	Проверка работоспособности сервиса
+GET /health — проверка работоспособности сервиса
+
+Документация:
+
+Swagger UI: http://localhost:8000/docs
+
+ReDoc: http://localhost:8000/redoc
+
 🛠 Стек технологий
-Инструмент	Назначение
-FastAPI	REST API фреймворк
-Uvicorn	ASGI-сервер
-Transformers (HuggingFace)	Загрузка и инференс моделей ruT5
-PyTorch	Бэкенд для моделей
-Bootstrap	Веб-интерфейс
-Jinja2	Шаблонизатор для HTML
+FastAPI — REST API фреймворк
+
+Uvicorn — ASGI-сервер
+
+Transformers — загрузка и инференс моделей ruT5
+
+PyTorch — бэкенд для моделей
+
+Bootstrap — веб-интерфейс
+
+Jinja2 — шаблонизатор HTML
+
 📝 Примечания
-Сервис использует две модели: MLE (базовая) и PPO (дообученная с учётом поэтических формальностей)
+Сервис использует две модели: MLE (базовая) и PPO (дообученная)
 
 Параметры семплинга (top_k, top_p, temperature) автоматически подбираются под длину продолжения
 
 Reward Score рассчитывается на основе метра, ритма, рифмы и лексического разнообразия
+
+
