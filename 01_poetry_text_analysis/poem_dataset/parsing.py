@@ -1,128 +1,132 @@
-import pandas as pd
+import scrapy
+import logging
+import json
+import csv
 import re
-from bs4 import BeautifulSoup
-import os
-def clean_text(text):
-"""
-Очищает текст от HTML-тегов, лишних символов и пробелов.
-Args:
- text (str): Входной текст.
-Returns:
- str: Очищенный текст (пустая строка для нестроковых входов).
-"""
-if not isinstance(text, str):
- return ""
-text = BeautifulSoup(text, "html.parser").get_text()
-# Удаление управляющих символов (кроме \n)
-text = re.sub(r'[\r\t]+', ' ', text)
-# Нормализация пробелов (сохраняем переносы строк)
-text = re.sub(r'[ ]{2,}', ' ', text) # Заменяем множественные пробелы
-text = text.strip()
-return text
-def preprocess_data(df, min_length=None, max_length=None, text_quantile=0.05):
-"""
-Предобрабатывает данные: очистка текста, удаление дубликатов и пропущенных значений.
-Args:
- df (pd.DataFrame): Исходный датасет. Обязательная колонка: 'Text'.
- min_length (int, optional): Минимальная длина текста. Автовычисление, если None.
- max_length (int, optional): Максимальная длина текста. Автовычисление, если None.
- text_quantile (float): Квантиль для автовычисления границ длины (по умолчанию 0.05).
-Returns:
- pd.DataFrame: Предобработанный датасет.
- Raises:
- ValueError: Если отсутствует колонка 'Text'.
-"""
-# Проверка наличия обязательных колонок
-if 'Text' not in df.columns:
- raise ValueError("DataFrame должен содержать колонку 'Text'.")
-print("Начало предобработки данных...")
-# Очистка текста
-print("Очистка текста...")
-df['Text'] = df['Text'].apply(clean_text)
-# Удаление пустых текстов
-print("Удаление пустых текстов...")
-initial_rows = len(df)
-df = df[df['Text'] != ""]
-removed_empty = initial_rows - len(df)
-print(f"Удалено пустых текстов: {removed_empty}")
-# Удаление пропущенных значений
-print("Удаление строк с пропущенными значениями...")
-initial_rows = len(df)
-df = df.dropna(subset=['Text'])
-removed_na = initial_rows - len(df)
-print(f"Удалено строк с NaN: {removed_na}")
-# Удаление дубликатов
-print("Удаление дубликатов...")
-initial_rows = len(df)
-df = df.drop_duplicates(subset=['Text'])
-removed_dup = initial_rows - len(df)
-print(f"Удалено дубликатов: {removed_dup}")
-# Проверка наличия данных после очистки
-if df.empty:
- raise ValueError("После предобработки DataFrame пуст.")
-# Добавление длины текста
-print("Добавление длины текста...")
-df['Text_length'] = df['Text'].str.len()
-# Автоматическое определение границ длины
-if min_length is None or max_length is None:
- q_low = text_quantile
- q_high = 1 - text_quantile
- min_length = int(df['Text_length'].quantile(q_low)) if min_length is None else min_length
- max_length = int(df['Text_length'].quantile(q_high)) if max_length is None else max_length
- print(f"Автовычисление границ: min_length={min_length}, max_length={max_length}")
-# Фильтрация по длине
-print(f"Фильтрация текстов ({min_length}-{max_length} символов)...")
-initial_rows = len(df)
-df = df[(df['Text_length'] >= min_length) & (df['Text_length'] <= max_length)]removed_length = initial_rows - len(df)
-print(f"Удалено текстов: {removed_length}")
-# Удаление временной колонки (опционально)
-# df = df.drop(columns=['Text_length'])
-print(f"Предобработка завершена. Осталось строк: {len(df)}")
-return df
-def save_processed_data(df, output_path):
-"""
-Сохраняет предобработанные данные в CSV.
-Args:
- df (pd.DataFrame): Данные для сохранения.
- output_path (str): Путь к файлу.
-Raises:
- ValueError: Если данные пусты.
-"""
-if df.empty:
- raise ValueError("Нельзя сохранить пустой DataFrame.")
- os.makedirs(os.path.dirname(output_path), exist_ok=True)
-df.to_csv(output_path, index=False, encoding='utf-8')
-print(f"Данные сохранены в {output_path}")
-def main():
-"""
-Основная функция: загрузка, обработка и сохранение данных.
-"""
-try:
- # Для Google Colab
- from google.colab import drive
- drive.mount('/content/drive')
- base_path = '/content/drive/My Drive/vkr/'
-except ImportError:
- base_path = './'
-input_path = os.path.join(base_path, 'poems.csv')
-output_path = os.path.join(base_path, 'poems_processed.csv')
-try:
- print(f"Загрузка данных из {input_path}")
- df = pd.read_csv(input_path)
- print(f"Загружено строк: {len(df)}")
- print("Пример данных до обработки:\n", df.head(2))
-except Exception as e:
- print(f"Ошибка загрузки: {e}")
+from scrapy.http import HtmlResponse
+from poetry_parser.spiders.base_spider import BasePoetrySpider
+from poetry_parser.utils.text_cleaner import clean_text, clean_poem_line # Импортируем функцию очистки
+текста
+logger = logging.getLogger(__name__)
+class RustihSpider(BasePoetrySpider):
+ name = 'rustih'
+ def __init__(self, *args, **kwargs):
+ super().__init__(site_name='rustih.ru', *args, **kwargs)
+ self.start_urls = ['https://rustih.ru/spisok-poetov/']
+ self.result_data = [] # Здесь будем хранить итоговые данные
+def parse(self, response):
+ logger.debug(f"Response URL: {response.url}")
+ logger.debug(f"Response body (first 500 chars): {response.body[:500]}") # Для отладки, первые
+500 символов
+ # Извлекаем ссылки на страницы поэтов
+ poet_links = response.css(self.site_config.selectors.poets_list).getall()
+ logger.debug(f"Found {len(poet_links)} poet links")
+ # count = 0 # Добавляем счетчик для ограничения количества поэтов
+ for href in poet_links:
+ # if count >= 5: # Ограничиваем обработку до 5 поэтов
+ # break
+ url = response.urljoin(href)
+ logger.debug(f"Processing poet URL: {url}")
+ yield scrapy.Request(url, callback=self.parse_author)
+ # count += 1
+ def parse_author(self, response):
+ logger.debug(f"Poet page URL: {response.url}")
+ # Извлекаем имя поэта
+poet_name = response.css(self.site_config.selectors.poet_name).get()
+ if poet_name:
+ # Очищаем имя поэта от лишнего текста
+ poet_name = poet_name.split(':')[0].strip()
+ logger.debug(f"Poet name: {poet_name}")
+ else:
+ logger.warning(f"Poet name not found on page: {response.url}")
  return
-try:
- df_processed = preprocess_data(df)
- print("\nПример данных после обработки:\n", df_processed.head(2))
-except Exception as e:
- print(f"Ошибка обработки: {e}")
+ # Извлекаем ссылки на стихотворения
+ poem_links = response.css(self.site_config.selectors.poem_links).getall()
+ if not poem_links:
+ logger.warning(f"No poem links found for poet: {poet_name} on page: {response.url}")
  return
-try:
- save_processed_data(df_processed, output_path)
-except Exception as e:
- print(f"Ошибка сохранения: {e}")
-if __name__ == "__main__":
-main()
+ logger.debug(f"Found {len(poem_links)} poem links for poet {poet_name}")
+ # count = 0 # Добавляем счетчик для ограничения количества стихотворений
+ for href in poem_links:
+ # if count >= 5: # Ограничиваем обработку до 5 стихотворений
+ # break
+ url = response.urljoin(href)
+ logger.debug(f"Processing poem URL: {url}")
+ yield scrapy.Request(url, callback=self.parse_poem, cb_kwargs={"poet_name": poet_name})
+ # count += 1
+ def parse_poem(self, response, poet_name):
+ logger.debug(f"Страница стихотворения: {response.url}")
+ # Извлекаем название стихотворения
+ title = response.css(self.site_config.selectors.poem_title).get()
+ if title:
+ title = title.strip()
+ logger.debug(f"Название стихотворения: {title}")
+ else:
+ logger.warning(f"Название стихотворения не найдено на странице: {response.url}")
+ return
+ # Извлекаем весь текст
+ full_text = response.body.decode('utf-8') # Явно указываем кодировку
+ # Находим индекс заголовка анализа
+ analysis_index = full_text.find('<h2>Анализ стихотворения')
+ if analysis_index != -1:
+ # Обрезаем текст до начала анализа
+ poem_text = full_text[:analysis_index]
+ else:
+ poem_text = full_text
+# Создаем временный response для парсинга обрезанного текста
+ limited_response = HtmlResponse(
+ url=response.url,
+ body=poem_text.encode('utf-8'),
+ encoding='utf-8'
+ )
+ # Извлекаем строфы из обрезанного текста
+ stanzas = limited_response.css(self.site_config.selectors.poem_stanzas).getall()
+ if not stanzas:
+ logger.warning(f"Текст стихотворения не найден на странице: {response.url}")
+ return
+ grouped_lines = []
+ for stanza in stanzas:
+ # Разделяем строфу на строки по тегу <br>
+ lines = re.split(r'<br\s*/?>', stanza)
+ cleaned_lines = []
+ for line in lines:
+ cleaned_line = clean_poem_line(line)
+ if cleaned_line and self.is_poetry_line(cleaned_line): # Проверяем, что строка похожа
+на поэзию
+ cleaned_lines.append(cleaned_line)
+ if cleaned_lines:
+ grouped_lines.append(cleaned_lines)
+ # Удаляем прозу после стихотворения
+ grouped_lines = self.remove_prose_after_poem(grouped_lines)
+ # Сохраняем данные о стихотворении
+ self.result_data.append({
+ "author": poet_name,
+ "title": title,
+ "text": grouped_lines, # Список строф
+ "url": response.url
+ })
+def closed(self, reason):
+ # Сохраняем данные в CSV при завершении работы паука
+ with open('poems.csv', 'w', encoding='utf-8', newline='') as f:
+ writer = csv.writer(f)
+ writer.writerow(['Author', 'Title', 'Text', 'URL']) # Заголовки столбцов
+ for poem in self.result_data:
+ formatted_text = '\n\n'.join(['\n'.join(stanza) for stanza in poem["text"]])
+ writer.writerow([poem['author'], poem['title'], formatted_text, poem['url']])
+ logger.info(f"Saved {len(self.result_data)} poems to poems.csv
+ def is_poetry_line(self, line: str) -> bool:
+ line = line.strip()
+ if not line:
+ return False
+ if len(line) > 90: # Длинные строки — скорее всего, проза
+ return False
+ if len(line.split()) <= 1: # Слишком короткие строки игнорируем
+ return False
+ return True
+ def remove_prose_after_poem(self, grouped_lines: list) -> list:
+ cleaned_grouped_lines = []
+ for stanza in grouped_lines:
+ if all(len(line) > 150 for line in stanza): # Если строфа выглядит как проза
+ break
+ cleaned_grouped_lines.append(stanza)
+ return cleaned_grouped_lines
